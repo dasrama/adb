@@ -8,7 +8,7 @@ export function App() {
   const [editingTask, setEditingTask] = useState('');
   const [savingId, setSavingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const API_BASE = 'http://localhost:8000/todos/';
+  const API_BASE = 'http://localhost:8080/todos/';
 
   useEffect(() => {
     fetchTodos();
