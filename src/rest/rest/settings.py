@@ -15,6 +15,13 @@ from datetime import timedelta
 import sys, os
 from corsheaders.defaults import default_headers
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "content-type",
+]
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 print( "base dir path", BASE_DIR)
