@@ -1,0 +1,8 @@
+node_modules/
+\__pycache__
+.python-version
+.eslintcache
+package-lock.json
+mydatabase
+db/
+.env

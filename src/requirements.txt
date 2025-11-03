@@ -6,7 +6,7 @@ attrs==20.2.0
 backcall==0.2.0
 billiard==3.6.3.0
 bleach==3.2.1
-celery==5.0.5
+celery
 certifi==2020.6.20
 cffi==1.14.3
 chardet==3.0.4
