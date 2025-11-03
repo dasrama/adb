@@ -6,6 +6,9 @@ export function App() {
   const [task, setTask] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingTask, setEditingTask] = useState('');
+  const [savingId, setSavingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const API_BASE = 'http://localhost:8000/todos/';
 
   useEffect(() => {
     fetchTodos();
@@ -13,7 +16,8 @@ export function App() {
 
   const fetchTodos = async () => {
     try {
-      const res = await fetch('http://localhost:8080/todos/');
+      const res = await fetch(API_BASE);
+      if (!res.ok) throw new Error(`Fetch failed ${res.status}`);
       const data = await res.json();
       setTodos(data || []);
     } catch (err) {
@@ -25,14 +29,14 @@ export function App() {
     e.preventDefault();
     if (!task.trim()) return;
     try {
-      const res = await fetch('http://localhost:8080/todos/', {
+      const res = await fetch(API_BASE, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({ task }),
       });
       if (res.ok) {
         setTask('');
-        fetchTodos();
+        await fetchTodos();
       } else {
         console.error('Failed to create todo', await res.text());
       }
@@ -43,15 +47,20 @@ export function App() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this todo?')) return;
+    setDeletingId(id);
     try {
-      const res = await fetch(`http://localhost:8080/todos/${id}/`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}${id}/`, { method: 'DELETE', headers: { 'Accept': 'application/json' } });
       if (res.status === 204 || res.ok) {
-        fetchTodos();
+        setTodos((prev) => prev.filter((t) => t._id !== id));
       } else {
         console.error('Failed to delete', await res.text());
+        await fetchTodos();
       }
     } catch (err) {
       console.error('Delete failed', err);
+      await fetchTodos();
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -67,21 +76,29 @@ export function App() {
 
   const saveEdit = async (id) => {
     if (!editingTask.trim()) return;
+    setSavingId(id);
     try {
-      const res = await fetch(`http://localhost:8080/todos/${id}/`, {
+      const res = await fetch(`${API_BASE}${id}/`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({ task: editingTask }),
       });
       if (res.ok) {
+        try {
+          const updated = await res.json();
+          setTodos((prev) => prev.map((t) => (t._id === id ? updated : t)));
+        } catch {
+          await fetchTodos();
+        }
         setEditingId(null);
         setEditingTask('');
-        fetchTodos();
       } else {
         console.error('Failed to update', await res.text());
       }
     } catch (err) {
       console.error('Update failed', err);
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -107,33 +124,29 @@ export function App() {
               <div className="todo-actions">
                 {editingId === t._id ? (
                   <>
-                    <button className="icon-btn save-btn" onClick={() => saveEdit(t._id)}>Save</button>
-                    <button className="icon-btn cancel-btn" onClick={cancelEdit}>Cancel</button>
+                    <button
+                      className="icon-btn save-btn"
+                      onClick={() => saveEdit(t._id)}
+                      disabled={savingId === t._id}
+                    >
+                      {savingId === t._id ? 'Saving…' : 'Save'}
+                    </button>
+                    <button className="icon-btn cancel-btn" onClick={cancelEdit}>
+                      Cancel
+                    </button>
                   </>
                 ) : (
                   <>
-                    <button
-                      className="icon-btn edit-btn"
-                      title="Edit"
-                      onClick={() => startEdit(t._id, t.task)}
-                    >
-                      {/* pencil SVG */}
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="#2b8aee"/>
-                        <path d="M20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="#1c6fb8"/>
-                      </svg>
+                    <button className="icon-btn edit-btn" title="Edit" onClick={() => startEdit(t._id, t.task)}>
+                      ✏️
                     </button>
-
                     <button
                       className="icon-btn delete-btn"
                       title="Delete"
                       onClick={() => handleDelete(t._id)}
+                      disabled={deletingId === t._id}
                     >
-                      {/* trash SVG */}
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M6 19a2 2 0 002 2h8a2 2 0 002-2V7H6v12z" fill="#ff6b6b"/>
-                        <path d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="#ff4d4f"/>
-                      </svg>
+                      🗑️
                     </button>
                   </>
                 )}
