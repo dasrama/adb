@@ -76,8 +76,6 @@ button:hover {
   margin-bottom: 2rem;
 }
 
-/* ...existing code... */
-
 .todo-item {
   display: flex;
   align-items: center;
