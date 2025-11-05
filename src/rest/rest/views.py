@@ -4,63 +4,92 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 import logging
-import json
 
 from .repository import TodoRepository
+from .serializers import TodoSerializer
 
 repo = TodoRepository()
 
-
 @method_decorator(csrf_exempt, name='dispatch')
 class TodoListView(APIView):
+
     def get(self, request):
         try:
             items = repo.list()
             return Response(items, status=status.HTTP_200_OK)
         except Exception as exc:
             logging.exception("Failed to fetch todos")
-            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "success": False,
+                "error": {"type": type(exc).__name__, "message": str(exc)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def post(self, request):
+        serializer = TodoSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({
+                "success": False,
+                "error": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
         try:
-            payload = request.data if hasattr(request, "data") else json.loads(request.body.decode("utf-8") or "{}")
-            task = payload.get("task") or payload.get("text")
-            if not task or not str(task).strip():
-                return Response({"error": "Missing 'task' field"}, status=status.HTTP_400_BAD_REQUEST)
-            created = repo.create(task=str(task).strip())
-            return Response(created, status=status.HTTP_201_CREATED)
+            created = repo.create(serializer.validated_data['task'])
+            return Response({
+                "success": True,
+                "data": created
+            }, status=status.HTTP_201_CREATED)
         except Exception as exc:
-            logging.exception("Failed to insert todo")
-            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            logging.exception("Failed to create todo")
+            return Response({
+                "success": False,
+                "error": {"type": type(exc).__name__, "message": str(exc)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class TodoDetailView(APIView):
-    def put(self, request, pk):
+
+    def get(self, request, pk):
+        todo = repo.get(pk)
+        if not todo:
+            return Response({
+                "success": False,
+                "error": {"message": "Todo not found"}
+            }, status=status.HTTP_404_NOT_FOUND)
+        return Response({"success": True, "data": todo}, status=status.HTTP_200_OK)
+
+    def patch(self, request, pk):
+        serializer = TodoSerializer(data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response({
+                "success": False,
+                "error": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
         try:
-            payload = request.data if hasattr(request, "data") else json.loads(request.body.decode("utf-8") or "{}")
-            update = {}
-            if "task" in payload:
-                update["task"] = payload.get("task")
-            if "done" in payload:
-                update["done"] = bool(payload.get("done"))
-            if not update:
-                return Response({"error": "Nothing to update"}, status=status.HTTP_400_BAD_REQUEST)
-            updated = repo.update(pk, update)
-            if not updated:
-                return Response({"error": "Not found or invalid id"}, status=status.HTTP_404_NOT_FOUND)
-            return Response(updated, status=status.HTTP_200_OK)
+            updated = repo.update(pk, serializer.validated_data)
+            if updated:
+                return Response({"success": True, "data": updated}, status=status.HTTP_200_OK)
+            return Response({
+                "success": False,
+                "error": {"message": "Update failed or todo not found"}
+            }, status=status.HTTP_404_NOT_FOUND)
         except Exception as exc:
-            logging.exception("Failed to update todo")
-            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logging.exception(f"Failed to update todo id={pk}")
+            return Response({
+                "success": False,
+                "error": {"type": type(exc).__name__, "message": str(exc)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request, pk):
         try:
             deleted = repo.delete(pk)
-            if not deleted:
-                return Response({"error": "Not found or invalid id"}, status=status.HTTP_404_NOT_FOUND)
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            if deleted:
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response({
+                "success": False,
+                "error": {"message": "Delete failed or todo not found"}
+            }, status=status.HTTP_404_NOT_FOUND)
         except Exception as exc:
-            logging.exception("Failed to delete todo")
-            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+            logging.exception(f"Failed to delete todo id={pk}")
+            return Response({
+                "success": False,
+                "error": {"type": type(exc).__name__, "message": str(exc)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
